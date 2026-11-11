@@ -28,9 +28,22 @@
     </div>
 
     <section class="card">
-      <h2>Add expense</h2>
+      <h2>Add transaction</h2>
       <form id="expense-form" novalidate>
         <div class="field">
+          <label for="type">Type</label>
+          <select id="type">
+            <option value="expense">Expense</option>
+            <option value="income">Income</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="category">Category</label>
+          <select id="category"></select>
+        </div>
+
+        <div class="field full">
           <label for="description">Description</label>
           <input type="text" id="description" placeholder="e.g. Lunch" maxlength="60">
         </div>
@@ -41,26 +54,13 @@
         </div>
 
         <div class="field">
-          <label for="category">Category</label>
-          <select id="category">
-            <option value="Food">Food</option>
-            <option value="Transport">Transport</option>
-            <option value="Shopping">Shopping</option>
-            <option value="Bills">Bills</option>
-            <option value="Entertainment">Entertainment</option>
-            <option value="Health">Health</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-
-        <div class="field">
           <label for="date">Date</label>
           <input type="date" id="date">
         </div>
 
         <p id="form-error" class="form-error" role="alert"></p>
 
-        <button type="submit">Add expense</button>
+        <button type="submit">Add transaction</button>
       </form>
     </section>
 
@@ -74,16 +74,7 @@
 
         <div class="field">
           <label for="filter-category">Category</label>
-          <select id="filter-category">
-            <option value="all">All categories</option>
-            <option value="Food">Food</option>
-            <option value="Transport">Transport</option>
-            <option value="Shopping">Shopping</option>
-            <option value="Bills">Bills</option>
-            <option value="Entertainment">Entertainment</option>
-            <option value="Health">Health</option>
-            <option value="Other">Other</option>
-          </select>
+          <select id="filter-category"></select>
         </div>
 
         <button type="button" id="clear-filters" class="secondary-btn">Clear filters</button>
@@ -93,8 +84,22 @@
 
     <section class="card">
       <h2>Summary</h2>
-      <p class="total-line">Total spent: <strong id="total-spent">₹0.00</strong></p>
-      <h3>By category</h3>
+      <div class="summary-grid">
+        <div class="stat">
+          <span class="stat-label">Income</span>
+          <strong id="total-income" class="stat-value income">₹0.00</strong>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Spent</span>
+          <strong id="total-spent" class="stat-value expense">₹0.00</strong>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Balance</span>
+          <strong id="balance" class="stat-value">₹0.00</strong>
+        </div>
+      </div>
+
+      <h3>Spending by category</h3>
       <p id="empty-summary" class="empty">Nothing to summarise yet.</p>
       <ul id="category-summary" class="category-list"></ul>
     </section>
@@ -108,8 +113,8 @@
     </section>
 
     <section class="card">
-      <h2>Expenses</h2>
-      <p id="empty-message" class="empty">No expenses yet.</p>
+      <h2>Transactions</h2>
+      <p id="empty-message" class="empty">No transactions yet.</p>
       <div class="table-wrap">
         <table>
           <thead>
