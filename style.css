@@ -261,3 +261,67 @@ th {
   position: relative;
   height: 300px;
 }
+
+/* ---------- Income / expense ---------- */
+:root {
+  --income: #16a34a;
+  --expense: #dc2626;
+}
+
+[data-theme="dark"] {
+  --income: #4ade80;
+  --expense: #f87171;
+}
+
+.income {
+  color: var(--income);
+}
+
+.expense {
+  color: var(--expense);
+}
+
+.full {
+  grid-column: 1 / -1;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.stat-value {
+  font-size: 1.15rem;
+  overflow-wrap: anywhere;
+}
+
+.stat-value.positive {
+  color: var(--income);
+}
+
+.stat-value.negative {
+  color: var(--expense);
+}
+
+@media (max-width: 520px) {
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
