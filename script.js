@@ -4,6 +4,7 @@ const descriptionInput = document.getElementById("description");
 const amountInput = document.getElementById("amount");
 const categoryInput = document.getElementById("category");
 const dateInput = document.getElementById("date");
+const formError = document.getElementById("form-error");
 const expenseList = document.getElementById("expense-list");
 const emptyMessage = document.getElementById("empty-message");
 const totalSpent = document.getElementById("total-spent");
@@ -16,9 +17,12 @@ const resultCount = document.getElementById("result-count");
 const chartCanvas = document.getElementById("category-chart");
 const chartWrap = document.getElementById("chart-wrap");
 const emptyChart = document.getElementById("empty-chart");
+const themeToggle = document.getElementById("theme-toggle");
 
 // ---------- Data ----------
 const STORAGE_KEY = "expense-tracker-data";
+const THEME_KEY = "expense-tracker-theme";
+const MAX_AMOUNT = 10000000;
 
 // One fixed colour per category, so a category keeps its colour when filters change
 const CATEGORY_COLORS = {
@@ -68,6 +72,83 @@ function getTodayString() {
 
 function formatAmount(amount) {
   return "₹" + amount.toFixed(2);
+}
+
+// ---------- Theme ----------
+// Reads a CSS variable (like --text) from the page, so JavaScript can reuse the theme colours
+function getThemeColor(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function updateThemeButton() {
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+  themeToggle.textContent = isDark ? "Light mode" : "Dark mode";
+}
+
+function toggleTheme() {
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+  const next = isDark ? "light" : "dark";
+
+  document.documentElement.setAttribute("data-theme", next);
+  try {
+    localStorage.setItem(THEME_KEY, next);
+  } catch (error) {
+    console.error("Could not save theme:", error);
+  }
+
+  updateThemeButton();
+  render(); // redraws the chart with the new colours
+}
+
+// ---------- Validation ----------
+function clearError() {
+  formError.textContent = "";
+  [descriptionInput, amountInput, categoryInput, dateInput].forEach((field) => {
+    field.classList.remove("invalid");
+  });
+}
+
+function showError(message, field) {
+  clearError();
+  formError.textContent = message;
+  field.classList.add("invalid");
+  field.focus();
+}
+
+// Returns { ok: true, expense } or { ok: false, message, field }
+function validateForm() {
+  const description = descriptionInput.value.trim();
+  const rawAmount = amountInput.value;
+  const amount = Math.round(Number(rawAmount) * 100) / 100; // keep 2 decimals
+  const category = categoryInput.value;
+  const date = dateInput.value;
+
+  if (description === "") {
+    return { ok: false, message: "Please enter a description.", field: descriptionInput };
+  }
+  if (description.length > 60) {
+    return { ok: false, message: "Description must be 60 characters or fewer.", field: descriptionInput };
+  }
+  if (rawAmount === "" || !Number.isFinite(amount)) {
+    return { ok: false, message: "Please enter a valid amount.", field: amountInput };
+  }
+  if (amount <= 0) {
+    return { ok: false, message: "Amount must be greater than zero.", field: amountInput };
+  }
+  if (amount > MAX_AMOUNT) {
+    return { ok: false, message: "Amount is too large.", field: amountInput };
+  }
+  if (!(category in CATEGORY_COLORS)) {
+    return { ok: false, message: "Please choose a category.", field: categoryInput };
+  }
+  if (date === "") {
+    return { ok: false, message: "Please choose a date.", field: dateInput };
+  }
+
+  return {
+    ok: true,
+    expense: { id: Date.now(), description, amount, category, date },
+  };
 }
 
 // ---------- Filtering ----------
@@ -218,11 +299,17 @@ function renderChart(list) {
   const values = entries.map(([, amount]) => amount);
   const colors = labels.map((category) => CATEGORY_COLORS[category] || "#9ca3af");
 
+  // Theme colours: legend text, and slice borders that blend into the card
+  const textColor = getThemeColor("--text");
+  const cardColor = getThemeColor("--card");
+
   if (categoryChart) {
-    // Chart already exists: just swap in the new data and redraw
+    // Chart already exists: just swap in the new data and colours, then redraw
     categoryChart.data.labels = labels;
     categoryChart.data.datasets[0].data = values;
     categoryChart.data.datasets[0].backgroundColor = colors;
+    categoryChart.data.datasets[0].borderColor = cardColor;
+    categoryChart.options.plugins.legend.labels.color = textColor;
     categoryChart.update();
   } else {
     categoryChart = new Chart(chartCanvas, {
@@ -233,6 +320,7 @@ function renderChart(list) {
           {
             data: values,
             backgroundColor: colors,
+            borderColor: cardColor,
             borderWidth: 2,
           },
         ],
@@ -241,7 +329,10 @@ function renderChart(list) {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { position: "bottom" },
+          legend: {
+            position: "bottom",
+            labels: { color: textColor },
+          },
           tooltip: {
             callbacks: {
               label: function (context) {
@@ -278,15 +369,15 @@ function deleteExpense(id) {
 form.addEventListener("submit", function (event) {
   event.preventDefault(); // stop the page from reloading
 
-  const expense = {
-    id: Date.now(),
-    description: descriptionInput.value.trim(),
-    amount: Number(amountInput.value),
-    category: categoryInput.value,
-    date: dateInput.value,
-  };
+  const result = validateForm();
 
-  expenses.push(expense);
+  if (!result.ok) {
+    showError(result.message, result.field);
+    return; // stop here, nothing is saved
+  }
+
+  clearError();
+  expenses.push(result.expense);
   saveExpenses();
   render();
 
@@ -295,11 +386,18 @@ form.addEventListener("submit", function (event) {
   descriptionInput.focus();
 });
 
-// ---------- Filter events ----------
+// Clear the error as soon as the user starts fixing the field
+[descriptionInput, amountInput, categoryInput, dateInput].forEach((field) => {
+  field.addEventListener("input", clearError);
+});
+
+// ---------- Filter and theme events ----------
 filterMonth.addEventListener("change", render);
 filterCategory.addEventListener("change", render);
 clearFiltersButton.addEventListener("click", clearFilters);
+themeToggle.addEventListener("click", toggleTheme);
 
 // ---------- Start-up ----------
 dateInput.value = getTodayString();
+updateThemeButton();
 render();
