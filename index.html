@@ -81,6 +81,14 @@
     </section>
 
     <section class="card">
+      <h2>Spending chart</h2>
+      <p id="empty-chart" class="empty">Nothing to chart yet.</p>
+      <div id="chart-wrap" class="chart-wrap">
+        <canvas id="category-chart"></canvas>
+      </div>
+    </section>
+
+    <section class="card">
       <h2>Expenses</h2>
       <p id="empty-message" class="empty">No expenses yet.</p>
       <div class="table-wrap">
@@ -100,6 +108,7 @@
     </section>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
