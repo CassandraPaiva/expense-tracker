@@ -6,6 +6,9 @@ const categoryInput = document.getElementById("category");
 const dateInput = document.getElementById("date");
 const expenseList = document.getElementById("expense-list");
 const emptyMessage = document.getElementById("empty-message");
+const totalSpent = document.getElementById("total-spent");
+const categorySummary = document.getElementById("category-summary");
+const emptySummary = document.getElementById("empty-summary");
 
 // ---------- Data ----------
 const STORAGE_KEY = "expense-tracker-data";
@@ -44,6 +47,21 @@ function getTodayString() {
 
 function formatAmount(amount) {
   return "₹" + amount.toFixed(2);
+}
+
+// ---------- Calculations ----------
+// Adds up the amount of every expense in the list
+function getTotal(list) {
+  return list.reduce((sum, expense) => sum + expense.amount, 0);
+}
+
+// Groups expenses by category and adds up each group.
+// Returns an object like { Food: 250, Transport: 80 }
+function getTotalsByCategory(list) {
+  return list.reduce((totals, expense) => {
+    totals[expense.category] = (totals[expense.category] || 0) + expense.amount;
+    return totals;
+  }, {});
 }
 
 // ---------- Render ----------
@@ -87,12 +105,47 @@ function renderExpenses() {
   });
 }
 
+function renderSummary() {
+  const total = getTotal(expenses);
+  const totals = getTotalsByCategory(expenses);
+
+  totalSpent.textContent = formatAmount(total);
+
+  categorySummary.innerHTML = "";
+  emptySummary.style.display = expenses.length === 0 ? "block" : "none";
+
+  // Object.entries turns { Food: 250 } into [["Food", 250]].
+  // Then we sort so the biggest category comes first.
+  const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+
+  entries.forEach(([category, amount]) => {
+    const percent = Math.round((amount / total) * 100);
+
+    const item = document.createElement("li");
+
+    const name = document.createElement("span");
+    name.textContent = category;
+
+    const value = document.createElement("span");
+    value.textContent = `${formatAmount(amount)} (${percent}%)`;
+
+    item.append(name, value);
+    categorySummary.appendChild(item);
+  });
+}
+
+// One function to refresh everything on screen
+function render() {
+  renderExpenses();
+  renderSummary();
+}
+
 // ---------- Delete an expense ----------
 function deleteExpense(id) {
   // Keep every expense EXCEPT the one with this id
   expenses = expenses.filter((expense) => expense.id !== id);
   saveExpenses();
-  renderExpenses();
+  render();
 }
 
 // ---------- Add an expense ----------
@@ -109,7 +162,7 @@ form.addEventListener("submit", function (event) {
 
   expenses.push(expense);
   saveExpenses();
-  renderExpenses();
+  render();
 
   form.reset();
   dateInput.value = getTodayString();
@@ -118,4 +171,4 @@ form.addEventListener("submit", function (event) {
 
 // ---------- Start-up ----------
 dateInput.value = getTodayString();
-renderExpenses();
+render();
