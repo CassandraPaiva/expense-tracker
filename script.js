@@ -1,5 +1,8 @@
 // ---------- Grab elements from the page ----------
 const form = document.getElementById("expense-form");
+const formTitle = document.getElementById("form-title");
+const submitButton = document.getElementById("submit-btn");
+const cancelButton = document.getElementById("cancel-edit");
 const typeInput = document.getElementById("type");
 const descriptionInput = document.getElementById("description");
 const amountInput = document.getElementById("amount");
@@ -56,6 +59,9 @@ let expenses = loadExpenses();
 
 // Holds the Chart.js chart once it has been created
 let categoryChart = null;
+
+// The id of the transaction being edited, or null when adding a new one
+let editingId = null;
 
 // ---------- Storage ----------
 function loadExpenses() {
@@ -205,6 +211,50 @@ function validateForm() {
   };
 }
 
+// ---------- Add / edit mode ----------
+// Puts the form back to its normal "add" state
+function resetForm() {
+  editingId = null;
+  form.reset();
+  updateCategoryOptions(); // reset() sets Type back to Expense, so rebuild the categories
+  dateInput.value = getTodayString();
+  clearError();
+
+  formTitle.textContent = "Add transaction";
+  submitButton.textContent = "Add transaction";
+  cancelButton.hidden = true;
+}
+
+// Loads one transaction into the form and switches to edit mode
+function startEdit(id) {
+  const item = expenses.find((expense) => expense.id === id);
+  if (!item) return;
+
+  editingId = id;
+  clearError();
+
+  // Order matters: set the type, rebuild the categories, THEN pick the category
+  typeInput.value = item.type;
+  updateCategoryOptions();
+  categoryInput.value = item.category;
+  descriptionInput.value = item.description;
+  amountInput.value = item.amount;
+  dateInput.value = item.date;
+
+  formTitle.textContent = "Edit transaction";
+  submitButton.textContent = "Save changes";
+  cancelButton.hidden = false;
+
+  render(); // highlights the row being edited
+  formTitle.scrollIntoView({ behavior: "smooth", block: "start" });
+  descriptionInput.focus();
+}
+
+function cancelEdit() {
+  resetForm();
+  render();
+}
+
 // ---------- Filtering ----------
 // Returns only the items that match the current month and category filters
 function getFilteredExpenses() {
@@ -264,6 +314,9 @@ function renderExpenses(list) {
 
   sorted.forEach((expense) => {
     const row = document.createElement("tr");
+    if (expense.id === editingId) {
+      row.className = "editing";
+    }
 
     const dateCell = document.createElement("td");
     dateCell.textContent = expense.date;
@@ -280,6 +333,17 @@ function renderExpenses(list) {
     amountCell.textContent = (isIncome ? "+" : "-") + formatAmount(expense.amount);
 
     const actionCell = document.createElement("td");
+    const actions = document.createElement("div");
+    actions.className = "row-actions";
+
+    const editButton = document.createElement("button");
+    editButton.type = "button";
+    editButton.className = "edit-btn";
+    editButton.textContent = "Edit";
+    editButton.addEventListener("click", function () {
+      startEdit(expense.id);
+    });
+
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
     deleteButton.className = "delete-btn";
@@ -287,7 +351,9 @@ function renderExpenses(list) {
     deleteButton.addEventListener("click", function () {
       deleteExpense(expense.id);
     });
-    actionCell.appendChild(deleteButton);
+
+    actions.append(editButton, deleteButton);
+    actionCell.appendChild(actions);
 
     row.append(dateCell, descriptionCell, categoryCell, amountCell, actionCell);
     expenseList.appendChild(row);
@@ -431,13 +497,18 @@ function render() {
 
 // ---------- Delete a transaction ----------
 function deleteExpense(id) {
+  // If we're editing the transaction that's being deleted, leave edit mode first
+  if (id === editingId) {
+    resetForm();
+  }
+
   // Always delete from the FULL list, not the filtered one
   expenses = expenses.filter((expense) => expense.id !== id);
   saveExpenses();
   render();
 }
 
-// ---------- Add a transaction ----------
+// ---------- Add or save a transaction ----------
 form.addEventListener("submit", function (event) {
   event.preventDefault(); // stop the page from reloading
 
@@ -448,16 +519,23 @@ form.addEventListener("submit", function (event) {
     return; // stop here, nothing is saved
   }
 
-  clearError();
-  expenses.push(result.expense);
-  saveExpenses();
-  render();
+  if (editingId !== null) {
+    // Edit mode: replace the matching item, keeping its original id
+    expenses = expenses.map((item) =>
+      item.id === editingId ? { ...result.expense, id: editingId } : item
+    );
+  } else {
+    // Add mode: put the new item on the end
+    expenses.push(result.expense);
+  }
 
-  form.reset();
-  updateCategoryOptions(); // reset() sets Type back to Expense, so rebuild the categories
-  dateInput.value = getTodayString();
+  saveExpenses();
+  resetForm(); // also leaves edit mode
+  render();
   descriptionInput.focus();
 });
+
+cancelButton.addEventListener("click", cancelEdit);
 
 // Changing the type changes which categories are on offer
 typeInput.addEventListener("change", updateCategoryOptions);
