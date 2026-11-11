@@ -180,3 +180,9 @@ th {
   font-size: 0.9rem;
   color: #616e7c;
 }
+
+/* Chart */
+.chart-wrap {
+  position: relative;
+  height: 300px;
+}
