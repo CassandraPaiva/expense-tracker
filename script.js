@@ -1,5 +1,6 @@
 // ---------- Grab elements from the page ----------
 const form = document.getElementById("expense-form");
+const typeInput = document.getElementById("type");
 const descriptionInput = document.getElementById("description");
 const amountInput = document.getElementById("amount");
 const categoryInput = document.getElementById("category");
@@ -7,7 +8,9 @@ const dateInput = document.getElementById("date");
 const formError = document.getElementById("form-error");
 const expenseList = document.getElementById("expense-list");
 const emptyMessage = document.getElementById("empty-message");
+const totalIncome = document.getElementById("total-income");
 const totalSpent = document.getElementById("total-spent");
+const balanceValue = document.getElementById("balance");
 const categorySummary = document.getElementById("category-summary");
 const emptySummary = document.getElementById("empty-summary");
 const filterMonth = document.getElementById("filter-month");
@@ -24,7 +27,19 @@ const STORAGE_KEY = "expense-tracker-data";
 const THEME_KEY = "expense-tracker-theme";
 const MAX_AMOUNT = 10000000;
 
-// One fixed colour per category, so a category keeps its colour when filters change
+// The single source of truth for categories. The dropdowns are built from these.
+const EXPENSE_CATEGORIES = [
+  "Food",
+  "Transport",
+  "Shopping",
+  "Bills",
+  "Entertainment",
+  "Health",
+  "Other",
+];
+const INCOME_CATEGORIES = ["Salary", "Freelance", "Gift", "Other income"];
+
+// One fixed colour per spending category, so a category keeps its colour when filters change
 const CATEGORY_COLORS = {
   Food: "#f97316",
   Transport: "#3b82f6",
@@ -35,7 +50,8 @@ const CATEGORY_COLORS = {
   Other: "#6b7280",
 };
 
-// Each expense is an object: { id, description, amount, category, date }
+// Each item is an object: { id, type, description, amount, category, date }
+// type is "expense" or "income"
 let expenses = loadExpenses();
 
 // Holds the Chart.js chart once it has been created
@@ -45,8 +61,9 @@ let categoryChart = null;
 function loadExpenses() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    // If nothing is saved yet, saved is null, so we start with an empty array
-    return saved ? JSON.parse(saved) : [];
+    const parsed = saved ? JSON.parse(saved) : [];
+    // Older saved items have no type. Treat them as expenses.
+    return parsed.map((item) => ({ ...item, type: item.type || "expense" }));
   } catch (error) {
     console.error("Could not load saved expenses:", error);
     return [];
@@ -70,8 +87,39 @@ function getTodayString() {
   return `${year}-${month}-${day}`;
 }
 
+// Handles negative numbers too, so a negative balance shows as -₹50.00
 function formatAmount(amount) {
-  return "₹" + amount.toFixed(2);
+  const sign = amount < 0 ? "-" : "";
+  return sign + "₹" + Math.abs(amount).toFixed(2);
+}
+
+function getCategories(type) {
+  return type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+}
+
+// ---------- Dropdowns ----------
+function addOption(select, value, label) {
+  const option = document.createElement("option");
+  option.value = value;
+  option.textContent = label;
+  select.appendChild(option);
+}
+
+// Rebuilds the form's category list to match the chosen type
+function updateCategoryOptions() {
+  categoryInput.innerHTML = "";
+  getCategories(typeInput.value).forEach((category) => {
+    addOption(categoryInput, category, category);
+  });
+}
+
+// The filter dropdown lists every category, income and expense
+function setupFilterCategories() {
+  filterCategory.innerHTML = "";
+  addOption(filterCategory, "all", "All categories");
+  [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES].forEach((category) => {
+    addOption(filterCategory, category, category);
+  });
 }
 
 // ---------- Theme ----------
@@ -101,9 +149,11 @@ function toggleTheme() {
 }
 
 // ---------- Validation ----------
+const formFields = [typeInput, categoryInput, descriptionInput, amountInput, dateInput];
+
 function clearError() {
   formError.textContent = "";
-  [descriptionInput, amountInput, categoryInput, dateInput].forEach((field) => {
+  formFields.forEach((field) => {
     field.classList.remove("invalid");
   });
 }
@@ -117,12 +167,16 @@ function showError(message, field) {
 
 // Returns { ok: true, expense } or { ok: false, message, field }
 function validateForm() {
+  const type = typeInput.value;
   const description = descriptionInput.value.trim();
   const rawAmount = amountInput.value;
   const amount = Math.round(Number(rawAmount) * 100) / 100; // keep 2 decimals
   const category = categoryInput.value;
   const date = dateInput.value;
 
+  if (type !== "expense" && type !== "income") {
+    return { ok: false, message: "Please choose expense or income.", field: typeInput };
+  }
   if (description === "") {
     return { ok: false, message: "Please enter a description.", field: descriptionInput };
   }
@@ -138,7 +192,7 @@ function validateForm() {
   if (amount > MAX_AMOUNT) {
     return { ok: false, message: "Amount is too large.", field: amountInput };
   }
-  if (!(category in CATEGORY_COLORS)) {
+  if (!getCategories(type).includes(category)) {
     return { ok: false, message: "Please choose a category.", field: categoryInput };
   }
   if (date === "") {
@@ -147,12 +201,12 @@ function validateForm() {
 
   return {
     ok: true,
-    expense: { id: Date.now(), description, amount, category, date },
+    expense: { id: Date.now(), type, description, amount, category, date },
   };
 }
 
 // ---------- Filtering ----------
-// Returns only the expenses that match the current month and category filters
+// Returns only the items that match the current month and category filters
 function getFilteredExpenses() {
   const month = filterMonth.value;       // "2026-11", or "" if not chosen
   const category = filterCategory.value; // "all" or a category name
@@ -172,16 +226,22 @@ function clearFilters() {
 }
 
 // ---------- Calculations ----------
-// Adds up the amount of every expense in the list
-function getTotal(list) {
-  return list.reduce((sum, expense) => sum + expense.amount, 0);
+// Adds up income and expenses separately. Returns { income: 500, expense: 120 }
+function getTotalsByType(list) {
+  return list.reduce(
+    (totals, item) => {
+      totals[item.type] += item.amount;
+      return totals;
+    },
+    { income: 0, expense: 0 }
+  );
 }
 
-// Groups expenses by category and adds up each group.
+// Groups items by category and adds up each group.
 // Returns an object like { Food: 250, Transport: 80 }
 function getTotalsByCategory(list) {
-  return list.reduce((totals, expense) => {
-    totals[expense.category] = (totals[expense.category] || 0) + expense.amount;
+  return list.reduce((totals, item) => {
+    totals[item.category] = (totals[item.category] || 0) + item.amount;
     return totals;
   }, {});
 }
@@ -193,7 +253,7 @@ function renderExpenses(list) {
   // Two different "empty" situations need two different messages
   if (list.length === 0) {
     emptyMessage.textContent =
-      expenses.length === 0 ? "No expenses yet." : "No expenses match these filters.";
+      expenses.length === 0 ? "No transactions yet." : "No transactions match these filters.";
     emptyMessage.style.display = "block";
   } else {
     emptyMessage.style.display = "none";
@@ -214,9 +274,10 @@ function renderExpenses(list) {
     const categoryCell = document.createElement("td");
     categoryCell.textContent = expense.category;
 
+    const isIncome = expense.type === "income";
     const amountCell = document.createElement("td");
-    amountCell.className = "num";
-    amountCell.textContent = formatAmount(expense.amount);
+    amountCell.className = isIncome ? "num income" : "num expense";
+    amountCell.textContent = (isIncome ? "+" : "-") + formatAmount(expense.amount);
 
     const actionCell = document.createElement("td");
     const deleteButton = document.createElement("button");
@@ -234,16 +295,25 @@ function renderExpenses(list) {
 }
 
 function renderSummary(list) {
-  const total = getTotal(list);
-  const totals = getTotalsByCategory(list);
+  const byType = getTotalsByType(list);
+  // Round to 2 decimals so tiny floating-point leftovers don't show up
+  const balance = Math.round((byType.income - byType.expense) * 100) / 100;
 
-  totalSpent.textContent = formatAmount(total);
+  totalIncome.textContent = formatAmount(byType.income);
+  totalSpent.textContent = formatAmount(byType.expense);
+  balanceValue.textContent = formatAmount(balance);
+  balanceValue.classList.toggle("positive", balance >= 0);
+  balanceValue.classList.toggle("negative", balance < 0);
+
+  // The category breakdown is about spending only
+  const spending = list.filter((item) => item.type === "expense");
+  const totals = getTotalsByCategory(spending);
 
   categorySummary.innerHTML = "";
 
-  if (list.length === 0) {
+  if (spending.length === 0) {
     emptySummary.textContent =
-      expenses.length === 0 ? "Nothing to summarise yet." : "No expenses match these filters.";
+      expenses.length === 0 ? "Nothing to summarise yet." : "No spending to show for these filters.";
     emptySummary.style.display = "block";
   } else {
     emptySummary.style.display = "none";
@@ -254,7 +324,7 @@ function renderSummary(list) {
   const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
 
   entries.forEach(([category, amount]) => {
-    const percent = Math.round((amount / total) * 100);
+    const percent = Math.round((amount / byType.expense) * 100);
 
     const item = document.createElement("li");
 
@@ -269,6 +339,7 @@ function renderSummary(list) {
   });
 }
 
+// Receives spending only (no income)
 function renderChart(list) {
   // If the Chart.js file failed to load, show a message instead of crashing
   if (typeof Chart === "undefined") {
@@ -286,7 +357,7 @@ function renderChart(list) {
     }
     chartWrap.style.display = "none";
     emptyChart.textContent =
-      expenses.length === 0 ? "Nothing to chart yet." : "No expenses match these filters.";
+      expenses.length === 0 ? "Nothing to chart yet." : "No spending to show for these filters.";
     emptyChart.style.display = "block";
     return;
   }
@@ -349,15 +420,16 @@ function renderChart(list) {
 // One function to refresh everything on screen
 function render() {
   const filtered = getFilteredExpenses();
+  const spending = filtered.filter((item) => item.type === "expense");
 
-  resultCount.textContent = `Showing ${filtered.length} of ${expenses.length} expenses`;
+  resultCount.textContent = `Showing ${filtered.length} of ${expenses.length} transactions`;
 
   renderExpenses(filtered);
   renderSummary(filtered);
-  renderChart(filtered);
+  renderChart(spending);
 }
 
-// ---------- Delete an expense ----------
+// ---------- Delete a transaction ----------
 function deleteExpense(id) {
   // Always delete from the FULL list, not the filtered one
   expenses = expenses.filter((expense) => expense.id !== id);
@@ -365,7 +437,7 @@ function deleteExpense(id) {
   render();
 }
 
-// ---------- Add an expense ----------
+// ---------- Add a transaction ----------
 form.addEventListener("submit", function (event) {
   event.preventDefault(); // stop the page from reloading
 
@@ -382,12 +454,16 @@ form.addEventListener("submit", function (event) {
   render();
 
   form.reset();
+  updateCategoryOptions(); // reset() sets Type back to Expense, so rebuild the categories
   dateInput.value = getTodayString();
   descriptionInput.focus();
 });
 
-// Clear the error as soon as the user starts fixing the field
-[descriptionInput, amountInput, categoryInput, dateInput].forEach((field) => {
+// Changing the type changes which categories are on offer
+typeInput.addEventListener("change", updateCategoryOptions);
+
+// Clear the error as soon as the user starts fixing a field
+formFields.forEach((field) => {
   field.addEventListener("input", clearError);
 });
 
@@ -398,6 +474,8 @@ clearFiltersButton.addEventListener("click", clearFilters);
 themeToggle.addEventListener("click", toggleTheme);
 
 // ---------- Start-up ----------
+updateCategoryOptions();
+setupFilterCategories();
 dateInput.value = getTodayString();
 updateThemeButton();
 render();
