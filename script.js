@@ -8,8 +8,30 @@ const expenseList = document.getElementById("expense-list");
 const emptyMessage = document.getElementById("empty-message");
 
 // ---------- Data ----------
+const STORAGE_KEY = "expense-tracker-data";
+
 // Each expense is an object: { id, description, amount, category, date }
-let expenses = [];
+let expenses = loadExpenses();
+
+// ---------- Storage ----------
+function loadExpenses() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    // If nothing is saved yet, saved is null, so we start with an empty array
+    return saved ? JSON.parse(saved) : [];
+  } catch (error) {
+    console.error("Could not load saved expenses:", error);
+    return [];
+  }
+}
+
+function saveExpenses() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses));
+  } catch (error) {
+    console.error("Could not save expenses:", error);
+  }
+}
 
 // ---------- Helpers ----------
 function getTodayString() {
@@ -50,11 +72,27 @@ function renderExpenses() {
     amountCell.className = "num";
     amountCell.textContent = formatAmount(expense.amount);
 
-    const actionCell = document.createElement("td"); // delete button comes in Step 4
+    const actionCell = document.createElement("td");
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "delete-btn";
+    deleteButton.textContent = "Delete";
+    deleteButton.addEventListener("click", function () {
+      deleteExpense(expense.id);
+    });
+    actionCell.appendChild(deleteButton);
 
     row.append(dateCell, descriptionCell, categoryCell, amountCell, actionCell);
     expenseList.appendChild(row);
   });
+}
+
+// ---------- Delete an expense ----------
+function deleteExpense(id) {
+  // Keep every expense EXCEPT the one with this id
+  expenses = expenses.filter((expense) => expense.id !== id);
+  saveExpenses();
+  renderExpenses();
 }
 
 // ---------- Add an expense ----------
@@ -70,6 +108,7 @@ form.addEventListener("submit", function (event) {
   };
 
   expenses.push(expense);
+  saveExpenses();
   renderExpenses();
 
   form.reset();
