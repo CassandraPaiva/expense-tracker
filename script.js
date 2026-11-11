@@ -13,12 +13,29 @@ const filterMonth = document.getElementById("filter-month");
 const filterCategory = document.getElementById("filter-category");
 const clearFiltersButton = document.getElementById("clear-filters");
 const resultCount = document.getElementById("result-count");
+const chartCanvas = document.getElementById("category-chart");
+const chartWrap = document.getElementById("chart-wrap");
+const emptyChart = document.getElementById("empty-chart");
 
 // ---------- Data ----------
 const STORAGE_KEY = "expense-tracker-data";
 
+// One fixed colour per category, so a category keeps its colour when filters change
+const CATEGORY_COLORS = {
+  Food: "#f97316",
+  Transport: "#3b82f6",
+  Shopping: "#a855f7",
+  Bills: "#ef4444",
+  Entertainment: "#eab308",
+  Health: "#22c55e",
+  Other: "#6b7280",
+};
+
 // Each expense is an object: { id, description, amount, category, date }
 let expenses = loadExpenses();
+
+// Holds the Chart.js chart once it has been created
+let categoryChart = null;
 
 // ---------- Storage ----------
 function loadExpenses() {
@@ -171,6 +188,73 @@ function renderSummary(list) {
   });
 }
 
+function renderChart(list) {
+  // If the Chart.js file failed to load, show a message instead of crashing
+  if (typeof Chart === "undefined") {
+    chartWrap.style.display = "none";
+    emptyChart.textContent = "Chart could not be loaded. Check your internet connection.";
+    emptyChart.style.display = "block";
+    return;
+  }
+
+  // Nothing to draw: remove any old chart and show a message
+  if (list.length === 0) {
+    if (categoryChart) {
+      categoryChart.destroy();
+      categoryChart = null;
+    }
+    chartWrap.style.display = "none";
+    emptyChart.textContent =
+      expenses.length === 0 ? "Nothing to chart yet." : "No expenses match these filters.";
+    emptyChart.style.display = "block";
+    return;
+  }
+
+  chartWrap.style.display = "block";
+  emptyChart.style.display = "none";
+
+  const entries = Object.entries(getTotalsByCategory(list)).sort((a, b) => b[1] - a[1]);
+  const labels = entries.map(([category]) => category);
+  const values = entries.map(([, amount]) => amount);
+  const colors = labels.map((category) => CATEGORY_COLORS[category] || "#9ca3af");
+
+  if (categoryChart) {
+    // Chart already exists: just swap in the new data and redraw
+    categoryChart.data.labels = labels;
+    categoryChart.data.datasets[0].data = values;
+    categoryChart.data.datasets[0].backgroundColor = colors;
+    categoryChart.update();
+  } else {
+    categoryChart = new Chart(chartCanvas, {
+      type: "doughnut",
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            data: values,
+            backgroundColor: colors,
+            borderWidth: 2,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: "bottom" },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                return `${context.label}: ${formatAmount(context.parsed)}`;
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+}
+
 // One function to refresh everything on screen
 function render() {
   const filtered = getFilteredExpenses();
@@ -179,6 +263,7 @@ function render() {
 
   renderExpenses(filtered);
   renderSummary(filtered);
+  renderChart(filtered);
 }
 
 // ---------- Delete an expense ----------
