@@ -9,6 +9,10 @@ const emptyMessage = document.getElementById("empty-message");
 const totalSpent = document.getElementById("total-spent");
 const categorySummary = document.getElementById("category-summary");
 const emptySummary = document.getElementById("empty-summary");
+const filterMonth = document.getElementById("filter-month");
+const filterCategory = document.getElementById("filter-category");
+const clearFiltersButton = document.getElementById("clear-filters");
+const resultCount = document.getElementById("result-count");
 
 // ---------- Data ----------
 const STORAGE_KEY = "expense-tracker-data";
@@ -49,6 +53,26 @@ function formatAmount(amount) {
   return "₹" + amount.toFixed(2);
 }
 
+// ---------- Filtering ----------
+// Returns only the expenses that match the current month and category filters
+function getFilteredExpenses() {
+  const month = filterMonth.value;       // "2026-11", or "" if not chosen
+  const category = filterCategory.value; // "all" or a category name
+
+  return expenses.filter((expense) => {
+    // Dates look like "2026-11-05", so startsWith("2026-11") matches November 2026
+    const matchesMonth = month === "" || expense.date.startsWith(month);
+    const matchesCategory = category === "all" || expense.category === category;
+    return matchesMonth && matchesCategory;
+  });
+}
+
+function clearFilters() {
+  filterMonth.value = "";
+  filterCategory.value = "all";
+  render();
+}
+
 // ---------- Calculations ----------
 // Adds up the amount of every expense in the list
 function getTotal(list) {
@@ -65,14 +89,20 @@ function getTotalsByCategory(list) {
 }
 
 // ---------- Render ----------
-function renderExpenses() {
+function renderExpenses(list) {
   expenseList.innerHTML = "";
 
-  // Show the "No expenses yet" message only when the array is empty
-  emptyMessage.style.display = expenses.length === 0 ? "block" : "none";
+  // Two different "empty" situations need two different messages
+  if (list.length === 0) {
+    emptyMessage.textContent =
+      expenses.length === 0 ? "No expenses yet." : "No expenses match these filters.";
+    emptyMessage.style.display = "block";
+  } else {
+    emptyMessage.style.display = "none";
+  }
 
-  // Newest date first. [...expenses] makes a copy so we don't reorder the original.
-  const sorted = [...expenses].sort((a, b) => b.date.localeCompare(a.date));
+  // Newest date first. [...list] makes a copy so we don't reorder the original.
+  const sorted = [...list].sort((a, b) => b.date.localeCompare(a.date));
 
   sorted.forEach((expense) => {
     const row = document.createElement("tr");
@@ -105,14 +135,21 @@ function renderExpenses() {
   });
 }
 
-function renderSummary() {
-  const total = getTotal(expenses);
-  const totals = getTotalsByCategory(expenses);
+function renderSummary(list) {
+  const total = getTotal(list);
+  const totals = getTotalsByCategory(list);
 
   totalSpent.textContent = formatAmount(total);
 
   categorySummary.innerHTML = "";
-  emptySummary.style.display = expenses.length === 0 ? "block" : "none";
+
+  if (list.length === 0) {
+    emptySummary.textContent =
+      expenses.length === 0 ? "Nothing to summarise yet." : "No expenses match these filters.";
+    emptySummary.style.display = "block";
+  } else {
+    emptySummary.style.display = "none";
+  }
 
   // Object.entries turns { Food: 250 } into [["Food", 250]].
   // Then we sort so the biggest category comes first.
@@ -136,13 +173,17 @@ function renderSummary() {
 
 // One function to refresh everything on screen
 function render() {
-  renderExpenses();
-  renderSummary();
+  const filtered = getFilteredExpenses();
+
+  resultCount.textContent = `Showing ${filtered.length} of ${expenses.length} expenses`;
+
+  renderExpenses(filtered);
+  renderSummary(filtered);
 }
 
 // ---------- Delete an expense ----------
 function deleteExpense(id) {
-  // Keep every expense EXCEPT the one with this id
+  // Always delete from the FULL list, not the filtered one
   expenses = expenses.filter((expense) => expense.id !== id);
   saveExpenses();
   render();
@@ -168,6 +209,11 @@ form.addEventListener("submit", function (event) {
   dateInput.value = getTodayString();
   descriptionInput.focus();
 });
+
+// ---------- Filter events ----------
+filterMonth.addEventListener("change", render);
+filterCategory.addEventListener("change", render);
+clearFiltersButton.addEventListener("click", clearFilters);
 
 // ---------- Start-up ----------
 dateInput.value = getTodayString();
