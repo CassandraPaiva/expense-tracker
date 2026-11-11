@@ -150,3 +150,33 @@ th {
 .category-list li:last-child {
   border-bottom: none;
 }
+
+/* Filters */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.filters .field {
+  flex: 1;
+  min-width: 160px;
+}
+
+.secondary-btn {
+  grid-column: auto;
+  padding: 0.6rem 1rem;
+  background: #e4e7eb;
+  color: #1f2933;
+}
+
+.secondary-btn:hover {
+  background: #cbd2d9;
+}
+
+.result-count {
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+  color: #616e7c;
+}
