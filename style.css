@@ -357,3 +357,21 @@ th {
 tr.editing td {
   background: rgba(59, 130, 246, 0.12);
 }
+
+/* ---------- Card header + export ---------- */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.card-header h2 {
+  margin: 0;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
