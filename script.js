@@ -24,6 +24,7 @@ const chartCanvas = document.getElementById("category-chart");
 const chartWrap = document.getElementById("chart-wrap");
 const emptyChart = document.getElementById("empty-chart");
 const themeToggle = document.getElementById("theme-toggle");
+const exportButton = document.getElementById("export-csv");
 
 // ---------- Data ----------
 const STORAGE_KEY = "expense-tracker-data";
@@ -296,6 +297,62 @@ function getTotalsByCategory(list) {
   }, {});
 }
 
+// ---------- CSV export ----------
+// Turns one value into a safe CSV cell: wrapped in quotes, with inner quotes doubled
+function csvEscape(value) {
+  let text = String(value);
+
+  // Spreadsheet apps run text starting with = + - @ as a formula.
+  // A leading apostrophe makes them treat it as plain text instead.
+  if (/^[=+\-@\t\r]/.test(text)) {
+    text = "'" + text;
+  }
+
+  text = text.replace(/"/g, '""');
+  return `"${text}"`;
+}
+
+// Builds the whole CSV file as one string
+function buildCsv(list) {
+  const header = ["Date", "Type", "Description", "Category", "Amount"];
+
+  // Newest date first, same order as the table
+  const rows = [...list]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .map((item) => [
+      item.date,
+      item.type,
+      item.description,
+      item.category,
+      item.amount.toFixed(2),
+    ]);
+
+  return [header, ...rows]
+    .map((row) => row.map(csvEscape).join(","))
+    .join("\r\n");
+}
+
+// Builds the CSV and makes the browser download it
+function exportCsv() {
+  const list = getFilteredExpenses();
+  if (list.length === 0) return;
+
+  // \uFEFF is a hidden marker that tells Excel the file is UTF-8
+  const csv = "\uFEFF" + buildCsv(list);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `expense-tracker-${getTodayString()}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  // Free the temporary URL once the download has started
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 // ---------- Render ----------
 function renderExpenses(list) {
   expenseList.innerHTML = "";
@@ -490,6 +547,9 @@ function render() {
 
   resultCount.textContent = `Showing ${filtered.length} of ${expenses.length} transactions`;
 
+  // Nothing to export when nothing is showing
+  exportButton.disabled = filtered.length === 0;
+
   renderExpenses(filtered);
   renderSummary(filtered);
   renderChart(spending);
@@ -545,11 +605,12 @@ formFields.forEach((field) => {
   field.addEventListener("input", clearError);
 });
 
-// ---------- Filter and theme events ----------
+// ---------- Filter, theme and export events ----------
 filterMonth.addEventListener("change", render);
 filterCategory.addEventListener("change", render);
 clearFiltersButton.addEventListener("click", clearFilters);
 themeToggle.addEventListener("click", toggleTheme);
+exportButton.addEventListener("click", exportCsv);
 
 // ---------- Start-up ----------
 updateCategoryOptions();
