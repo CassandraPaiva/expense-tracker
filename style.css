@@ -117,3 +117,36 @@ th {
     grid-template-columns: 1fr;
   }
 }
+
+/* Summary */
+.total-line {
+  font-size: 1.1rem;
+  margin: 0 0 1rem;
+}
+
+.total-line strong {
+  font-size: 1.5rem;
+}
+
+.card h3 {
+  font-size: 0.95rem;
+  color: #616e7c;
+  margin: 0 0 0.5rem;
+}
+
+.category-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.category-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e4e7eb;
+}
+
+.category-list li:last-child {
+  border-bottom: none;
+}
