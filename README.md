@@ -4,8 +4,8 @@ A simple, fast expense tracker that runs entirely in the browser. Log income and
 
 **[Live demo](https://YOUR-USERNAME.github.io/expense-tracker/)**
 
-![Expense Tracker screenshot](screenshot.png)
-![Expense Tracker in dark mode](screenshot-dark.png)
+![Expense Tracker screenshot](Screenshot-expensetrack.png)
+
 
 ## Features
 
