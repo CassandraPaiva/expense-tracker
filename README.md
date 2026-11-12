@@ -40,24 +40,6 @@ A simple, fast expense tracker that runs entirely in the browser. Log income and
 - Using `textContent` instead of `innerHTML` to avoid XSS
 - Escaping CSV cells and neutralising formula injection (cells starting with `=`, `+`, `-` or `@`)
 
-## Run it locally
-
-```bash
-git clone https://github.com/YOUR-USERNAME/expense-tracker.git
-cd expense-tracker
-```
-
-Then open `index.html` in your browser. There is nothing to install. The chart needs an internet connection to load Chart.js; the rest of the app works offline.
-
-## Project structure
-
-```
-expense-tracker/
-├── index.html     Page structure
-├── style.css      Styles and light/dark themes
-├── script.js      App logic
-└── screenshot.png
-```
 
 ## Notes
 
