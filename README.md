@@ -2,7 +2,7 @@
 
 A simple, fast expense tracker that runs entirely in the browser. Log income and expenses, see where your money goes, and export your data to CSV. No sign-up, no server, and your data never leaves your device.
 
-**[Live demo](https://YOUR-USERNAME.github.io/expense-tracker/)**
+**[Live demo](https://cassandrapaiva.github.io/expense-tracker/)**
 
 ![Expense Tracker screenshot](Screenshot-expensetrack.png)
 
